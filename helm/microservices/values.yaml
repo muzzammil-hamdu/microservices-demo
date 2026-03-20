@@ -1,0 +1,13 @@
+
+replicaCount: 2
+images:
+  frontend: acrdev12345.azurecr.io/frontend:latest
+  cart: acrdev12345.azurecr.io/cart:latest
+  product: acrdev12345.azurecr.io/product:latest
+  checkout: acrdev12345.azurecr.io/checkout:latest
+  payment: acrdev12345.azurecr.io/payment:latest
+  shipping: acrdev12345.azurecr.io/shipping:latest
+  email: acrdev12345.azurecr.io/email:latest
+  currency: acrdev12345.azurecr.io/currency:latest
+  recommendation: acrdev12345.azurecr.io/recommendation:latest
+  ad: acrdev12345.azurecr.io/ad:latest
