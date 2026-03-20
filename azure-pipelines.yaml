@@ -4,30 +4,53 @@ pool:
   name: projectpool
 
 variables:
-  IMAGE_TAG: latest
+  IMAGE_TAG: $(Build.BuildId)
+  BRANCH_NAME: main   # change if your branch is master
 
 stages:
-- stage: Update_Helm
+- stage: Update_Helm_and_Deploy
+  displayName: "Update Helm & Trigger ArgoCD"
   jobs:
   - job: Update
+    displayName: "Update values.yaml and push to repo"
     steps:
 
+    # ✅ Checkout repo with credentials
     - checkout: self
       persistCredentials: true
+      clean: true
 
-    # Update images to use public images (or ACR later)
+    # ✅ Debug (optional)
     - script: |
+        echo "Current branch:"
+        git branch
+        git status
+      displayName: "Debug Git State"
+
+    # ✅ Update Helm values (images)
+    - script: |
+        echo "Updating image references..."
+
         sed -i 's|frontend:.*|frontend: gcr.io/google-samples/microservices-demo/frontend:latest|' helm/microservices/values.yaml
         sed -i 's|cart:.*|cart: gcr.io/google-samples/microservices-demo/cartservice:latest|' helm/microservices/values.yaml
         sed -i 's|product:.*|product: gcr.io/google-samples/microservices-demo/productcatalogservice:latest|' helm/microservices/values.yaml
-      displayName: "Update Helm Images"
+        sed -i 's|checkout:.*|checkout: gcr.io/google-samples/microservices-demo/checkoutservice:latest|' helm/microservices/values.yaml
 
-    # Push back to repo
+      displayName: "Update Helm values.yaml"
+
+    # ✅ Commit & Push (FIXED 🚀)
     - script: |
+        echo "Committing changes..."
+
         git config user.email "shaikhussain752@gmail.com"
         git config user.name "muzzammil-hamdu"
 
         git add .
-        git commit -m "Update image references" || echo "No changes"
-        git push
-      displayName: "Push changes"
+        git commit -m "Update image references $(IMAGE_TAG)" || echo "No changes to commit"
+
+        echo "Pushing changes..."
+
+        # 🔥 FIX for detached HEAD
+        git push origin HEAD:$(BRANCH_NAME)
+
+      displayName: "Push changes to repo"
