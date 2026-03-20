@@ -9,7 +9,7 @@ spec:
     namespace: default
     server: https://kubernetes.default.svc
   source:
-    repoURL: https://your-repo.git
+    repoURL: https://github.com/muzzammil-hamdu/microservices-demo
     path: helm/microservices
     targetRevision: HEAD
   project: default
