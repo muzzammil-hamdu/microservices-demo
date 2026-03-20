@@ -1,9 +1,45 @@
-
-trigger:
-- main
+trigger: none
 
 pool:
-  vmImage: ubuntu-latest
+  name: projectpool
 
-steps:
-- script: echo "Build & push to ACR"
+variables:
+  ACR_NAME: acrdev12345
+  IMAGE_TAG: $(Build.BuildId)
+
+stages:
+- stage: Build_and_Push
+  jobs:
+  - job: Build
+    steps:
+
+    - checkout: self
+      persistCredentials: true
+
+    # Login to ACR
+    - script: |
+        az acr login --name $(ACR_NAME)
+      displayName: "Login to ACR"
+
+    # Build & Push
+    - script: |
+        docker build -t $(ACR_NAME).azurecr.io/frontend:$(IMAGE_TAG) ./frontend
+        docker push $(ACR_NAME).azurecr.io/frontend:$(IMAGE_TAG)
+      displayName: "Build & Push Frontend"
+
+    # Update Helm values
+    - script: |
+        sed -i 's|frontend:.*|frontend: $(ACR_NAME).azurecr.io/frontend:$(IMAGE_TAG)|' helm/microservices/values.yaml
+      displayName: "Update Helm values"
+
+    # 🔥 Git push using PAT
+    - script: |
+        git config user.email "$(GIT_EMAIL)"
+        git config user.name "$(GIT_USERNAME)"
+
+        git remote set-url origin https://$(GIT_USERNAME):$(GIT_TOKEN)@github.com/$(GIT_USERNAME)/microservices-aks.git
+
+        git add .
+        git commit -m "Update image tag $(IMAGE_TAG)" || echo "No changes"
+        git push origin HEAD:main
+      displayName: "Push changes to Git"
