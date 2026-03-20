@@ -5,52 +5,83 @@ pool:
 
 variables:
   IMAGE_TAG: $(Build.BuildId)
-  BRANCH_NAME: main   # change if your branch is master
+  BRANCH_NAME: main
+  ARGOCD_SERVER: http://51.124.55.73
+  ARGOCD_APP: microservices
 
 stages:
-- stage: Update_Helm_and_Deploy
-  displayName: "Update Helm & Trigger ArgoCD"
+- stage: Full_Deploy
+  displayName: "CI + CD via ArgoCD"
   jobs:
-  - job: Update
-    displayName: "Update values.yaml and push to repo"
+  - job: Deploy
     steps:
 
-    # ✅ Checkout repo with credentials
+    # ✅ Checkout
     - checkout: self
       persistCredentials: true
       clean: true
 
-    # ✅ Debug (optional)
+    # ✅ Update Helm values
     - script: |
-        echo "Current branch:"
-        git branch
-        git status
-      displayName: "Debug Git State"
-
-    # ✅ Update Helm values (images)
-    - script: |
-        echo "Updating image references..."
+        echo "Updating Helm values..."
 
         sed -i 's|frontend:.*|frontend: gcr.io/google-samples/microservices-demo/frontend:latest|' helm/microservices/values.yaml
         sed -i 's|cart:.*|cart: gcr.io/google-samples/microservices-demo/cartservice:latest|' helm/microservices/values.yaml
         sed -i 's|product:.*|product: gcr.io/google-samples/microservices-demo/productcatalogservice:latest|' helm/microservices/values.yaml
         sed -i 's|checkout:.*|checkout: gcr.io/google-samples/microservices-demo/checkoutservice:latest|' helm/microservices/values.yaml
 
-      displayName: "Update Helm values.yaml"
+      displayName: "Update Helm values"
 
-    # ✅ Commit & Push (FIXED 🚀)
+    # ✅ Commit & Push
     - script: |
-        echo "Committing changes..."
-
         git config user.email "shaikhussain752@gmail.com"
         git config user.name "muzzammil-hamdu"
 
         git add .
-        git commit -m "Update image references $(IMAGE_TAG)" || echo "No changes to commit"
+        git commit -m "Update images $(IMAGE_TAG)" || echo "No changes"
 
-        echo "Pushing changes..."
-
-        # 🔥 FIX for detached HEAD
         git push origin HEAD:$(BRANCH_NAME)
+      displayName: "Push to repo"
 
-      displayName: "Push changes to repo"
+    # ✅ Install ArgoCD CLI
+    - script: |
+        echo "Installing ArgoCD CLI..."
+
+        curl -sSL -o argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+        chmod +x argocd
+        sudo mv argocd /usr/local/bin/
+      displayName: "Install ArgoCD CLI"
+
+    # ✅ Login to ArgoCD
+    - script: |
+        echo "Logging into ArgoCD..."
+
+        argocd login $(ARGOCD_SERVER) \
+          --username admin \
+          --password ilWEEjcnA-lQEhNc \
+          --insecure
+      displayName: "ArgoCD Login"
+
+    # ✅ Create App if not exists
+    - script: |
+        echo "Checking if ArgoCD app exists..."
+
+        if argocd app get $(ARGOCD_APP) > /dev/null 2>&1; then
+          echo "App already exists"
+        else
+          echo "Creating ArgoCD app..."
+
+          argocd app create $(ARGOCD_APP) \
+            --repo https://dev.azure.com/<org>/<project>/_git/microservices-demo-app \
+            --path helm/microservices \
+            --dest-server https://kubernetes.default.svc \
+            --dest-namespace default
+        fi
+      displayName: "Create ArgoCD App (if needed)"
+
+    # ✅ Sync (DEPLOY 🚀)
+    - script: |
+        echo "Syncing ArgoCD app..."
+
+        argocd app sync $(ARGOCD_APP)
+      displayName: "ArgoCD Sync"
