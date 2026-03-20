@@ -4,42 +4,30 @@ pool:
   name: projectpool
 
 variables:
-  ACR_NAME: acrdev12345
-  IMAGE_TAG: $(Build.BuildId)
+  IMAGE_TAG: latest
 
 stages:
-- stage: Build_and_Push
+- stage: Update_Helm
   jobs:
-  - job: Build
+  - job: Update
     steps:
 
     - checkout: self
       persistCredentials: true
 
-    # Login to ACR
+    # Update images to use public images (or ACR later)
     - script: |
-        az acr login --name $(ACR_NAME)
-      displayName: "Login to ACR"
+        sed -i 's|frontend:.*|frontend: gcr.io/google-samples/microservices-demo/frontend:latest|' helm/microservices/values.yaml
+        sed -i 's|cart:.*|cart: gcr.io/google-samples/microservices-demo/cartservice:latest|' helm/microservices/values.yaml
+        sed -i 's|product:.*|product: gcr.io/google-samples/microservices-demo/productcatalogservice:latest|' helm/microservices/values.yaml
+      displayName: "Update Helm Images"
 
-    # Build & Push
+    # Push back to repo
     - script: |
-        docker build -t $(ACR_NAME).azurecr.io/frontend:$(IMAGE_TAG) ./frontend
-        docker push $(ACR_NAME).azurecr.io/frontend:$(IMAGE_TAG)
-      displayName: "Build & Push Frontend"
-
-    # Update Helm values
-    - script: |
-        sed -i 's|frontend:.*|frontend: $(ACR_NAME).azurecr.io/frontend:$(IMAGE_TAG)|' helm/microservices/values.yaml
-      displayName: "Update Helm values"
-
-    # 🔥 Git push using PAT
-    - script: |
-        git config user.email "$(GIT_EMAIL)"
-        git config user.name "$(GIT_USERNAME)"
-
-        git remote set-url origin https://$(GIT_USERNAME):$(GIT_TOKEN)@github.com/$(GIT_USERNAME)/microservices-aks.git
+        git config user.email "shaikhussain752@gmail.com"
+        git config user.name "muzzammil-hamdu"
 
         git add .
-        git commit -m "Update image tag $(IMAGE_TAG)" || echo "No changes"
-        git push origin HEAD:main
-      displayName: "Push changes to Git"
+        git commit -m "Update image references" || echo "No changes"
+        git push
+      displayName: "Push changes"
